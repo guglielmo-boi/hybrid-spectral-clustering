@@ -1,7 +1,5 @@
 #include "k_means.hpp"
 
-#include "similarity_matrix.hpp"
-
 #include <random>
 #include <limits>
 #include <cmath>
@@ -17,6 +15,28 @@ Matrix init_centroids(const Matrix& X, int k) {
     }
 
     return centroids;
+}
+
+std::vector<int> evaluate_labels(const Matrix& X, const Matrix& centroids, int l, int r) {
+    std::vector<int> labels;
+
+    for (int i = l; i < r; ++i) {
+        double min_distance = std::numeric_limits<double>::max();
+        int label = -1;
+
+        for (int j = 0; j < centroids.rows(); ++j) {
+            double distance = (X.row(i) - centroids.row(j)).squaredNorm();
+
+            if (distance < min_distance) {
+                min_distance = distance;
+                label = j;
+            }
+        }
+
+        labels.push_back(label);
+    }
+
+    return labels;
 }
 
 std::vector<int> k_means(const Matrix& X, int k, int max_iters) {
@@ -44,7 +64,7 @@ std::vector<int> k_means(const Matrix& X, int k, int max_iters) {
 
     for (int iter = 0; iterating && iter < max_iters; ++iter) {
         MPI_Bcast(global_centroids.data(), k * m, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        local_labels = evaluate_k_means_labels(X, global_centroids, l, r);
+        local_labels = evaluate_labels(X, global_centroids, l, r);
 
         MPI_Gather(local_labels.data(), count, MPI_INT, global_labels.data(), count, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -52,42 +72,43 @@ std::vector<int> k_means(const Matrix& X, int k, int max_iters) {
             Matrix new_centroids = Matrix::Zero(k, m);
             std::vector<int> sizes(k, 0);
 
+            // calculate new centroids
             for (int i = 0; i < n; ++i) {
                 int c = global_labels[i];
                 new_centroids.row(c) += X.row(i);
                 sizes[c] += 1;
             }
 
-            for (int j = 0; j < k; ++j) {
-                if (sizes[j] > 0) {
-                    new_centroids.row(j) /= static_cast<double>(sizes[j]);
+            for (int i = 0; i < k; ++i) {
+                if (sizes[i] > 0) {
+                    new_centroids.row(i) /= static_cast<double>(sizes[i]);
                 }
             }
 
-            for (int j = 0; j < k; ++j) {
-                if (sizes[j] == 0) {
+            // split empty clusters
+            for (int i = 0; i < k; ++i) {
+                if (sizes[i] == 0) {
                     int largest = std::distance(sizes.begin(), std::max_element(sizes.begin(), sizes.end()));
 
-                    double max_distance = -1.0;
+                    double max_distance = std::numeric_limits<double>::min();
                     int farthest = -1;
 
-                    for (int i = 0; i < n; ++i) {
-                        if (global_labels[i] == largest) {
-                            double d = (X.row(i) - global_centroids.row(largest)).squaredNorm();
+                    for (int j = 0; j < n; ++j) {
+                        if (global_labels[j] == largest) {
+                            double distance = (X.row(j) - global_centroids.row(largest)).squaredNorm();
 
-                            if (d > max_distance) {
-                                max_distance = d;
-                                farthest = i;
+                            if (distance > max_distance) {
+                                max_distance = distance;
+                                farthest = j;
                             }
                         }
                     }
 
-                    new_centroids.row(j) = X.row(farthest);
-                    sizes[j] = 1;
+                    new_centroids.row(i) = X.row(farthest);
+                    sizes[i] = 1;
                     sizes[largest] -= 1;
                 }
             }
-
 
             // convergence check
             if ((new_centroids - global_centroids).norm() < 1e-3) {

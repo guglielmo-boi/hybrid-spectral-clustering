@@ -1,7 +1,40 @@
 #include "spectral_clustering.hpp"
 
-#include "similarity_matrix.hpp"
 #include "k_means.hpp"
+
+std::vector<double> evaluate_gaussian_similarity_values(const Matrix& X, int l, int r, double sigma) {
+    std::vector<double> similarity_values;
+    
+    const double denominator = 2 * sigma * sigma;
+
+    for (int i = l; i < r; ++i) {
+        for (int j = 0; j < X.rows(); ++j) {
+            if (i != j) {
+                double squared_euclidean_distance = (X.row(i) - X.row(j)).squaredNorm();
+                double similarity = exp(-squared_euclidean_distance / denominator);
+                similarity_values.push_back(similarity);
+            } else {
+                similarity_values.push_back(0.0);
+            }
+        }
+    }
+
+    return similarity_values;
+}
+
+std::vector<double> evaluate_diagonal_values(const Eigen::VectorXd& degrees, int l, int r) {
+    std::vector<double> diagonal_values;
+
+    for (int i = l; i < r; ++i) {
+        if (degrees(i) > 1e-12) {
+            diagonal_values.push_back(1.0 / sqrt(degrees(i)));
+        } else {
+            diagonal_values.push_back(0.0);
+        }
+    }
+
+    return diagonal_values;
+}
 
 std::vector<int> spectral_clustering(Matrix& X, int k, double sigma) {
     int world_rank;
@@ -54,7 +87,11 @@ std::vector<int> spectral_clustering(Matrix& X, int k, double sigma) {
 
     // eigenvectors normalization
     MPI_Scatter(global_eigenvectors.data(), count * k, MPI_DOUBLE, local_eigenvectors.data(), count * k, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    normalize_eigenvectors(local_eigenvectors);
+
+    for (int i = 0; i < count; ++i) {
+        local_eigenvectors.row(i).normalize();
+    }
+
     MPI_Allgather(local_eigenvectors.data(), count * k, MPI_DOUBLE, global_eigenvectors.data(), count * k, MPI_DOUBLE, MPI_COMM_WORLD);
 
     return k_means(global_eigenvectors, k);

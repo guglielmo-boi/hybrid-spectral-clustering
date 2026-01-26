@@ -25,7 +25,6 @@ set(SOURCES
     src/csv.cpp
     src/k_means.cpp
     src/main.cpp
-    src/similarity_matrix.cpp
     src/spectral_clustering.cpp
 )
 
