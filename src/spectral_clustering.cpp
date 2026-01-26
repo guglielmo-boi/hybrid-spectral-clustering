@@ -21,7 +21,7 @@ std::vector<int> spectral_clustering(Matrix& X, int k, double sigma) {
 
     if (world_rank != 0) {
         // similarity matrix
-        MPI_Gather(local_similarity_values.data(), n * count, MPI_DOUBLE, nullptr, 0, MPI_DOUBLE, 0, MPI_COMM_WORLD); 
+        MPI_Gather(local_similarity_values.data(), count * n, MPI_DOUBLE, nullptr, 0, MPI_DOUBLE, 0, MPI_COMM_WORLD); 
 
         // diagonal matrix
         Eigen::VectorXd degrees = Eigen::VectorXd::Zero(n);    
@@ -31,7 +31,7 @@ std::vector<int> spectral_clustering(Matrix& X, int k, double sigma) {
     } else {
         // similarity matrix
         std::vector<double> global_similarity_values(n * n);
-        MPI_Gather(local_similarity_values.data(), n * count, MPI_DOUBLE, global_similarity_values.data(), n * count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Gather(local_similarity_values.data(), count * n, MPI_DOUBLE, global_similarity_values.data(), count * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         Matrix similarity_matrix = Eigen::Map<Matrix>(global_similarity_values.data(), n, n);
     
         // diagonal matrix
@@ -53,7 +53,6 @@ std::vector<int> spectral_clustering(Matrix& X, int k, double sigma) {
     }
 
     // eigenvectors normalization
-    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Scatter(global_eigenvectors.data(), count * k, MPI_DOUBLE, local_eigenvectors.data(), count * k, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     normalize_eigenvectors(local_eigenvectors);
     MPI_Allgather(local_eigenvectors.data(), count * k, MPI_DOUBLE, global_eigenvectors.data(), count * k, MPI_DOUBLE, MPI_COMM_WORLD);

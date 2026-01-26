@@ -26,6 +26,7 @@ std::vector<int> k_means(const Matrix& X, int k, int max_iters) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
     int n = X.rows();
+    int m = X.cols();
     int count = n / world_size; // number of rows for each process
     int l = count * world_rank; // index of the local begin row
     int r = count * (world_rank + 1); // index of the local end row
@@ -39,53 +40,64 @@ std::vector<int> k_means(const Matrix& X, int k, int max_iters) {
     std::vector<int> local_labels(count, -1); 
     std::vector<int> global_labels(n, -1);
 
-    if (world_rank != 0) {
-        bool iterating;
-        MPI_Bcast(&iterating, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
+    int iterating = 1;
 
-        while (iterating) {
-            MPI_Bcast(global_centroids.data(), k, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-            local_labels = evaluate_k_means_labels(X, global_centroids, l, r);
-            MPI_Gather(local_labels.data(), count, MPI_INT, nullptr, 0, MPI_INT, 0, MPI_COMM_WORLD);
+    for (int iter = 0; iterating && iter < max_iters; ++iter) {
+        MPI_Bcast(global_centroids.data(), k * m, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        local_labels = evaluate_k_means_labels(X, global_centroids, l, r);
 
-            MPI_Barrier(MPI_COMM_WORLD);
-            MPI_Bcast(&iterating, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
-        }
-    } else {
-        for (int iter = 0; iter < max_iters; ++iter) {
-            std::cout << iter << std::endl;
-            bool iterating = true;
-            MPI_Bcast(&iterating, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
+        MPI_Gather(local_labels.data(), count, MPI_INT, global_labels.data(), count, MPI_INT, 0, MPI_COMM_WORLD);
 
-            MPI_Bcast(global_centroids.data(), k, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-            local_labels = evaluate_k_means_labels(X, global_centroids, l, r);
-            MPI_Gather(local_labels.data(), count, MPI_INT, global_labels.data(), count, MPI_INT, 0, MPI_COMM_WORLD);
-
-            Matrix new_centroids = Matrix::Zero(k, X.cols());
-            std::vector<int> count(k, 0);
+        if (world_rank == 0) {
+            Matrix new_centroids = Matrix::Zero(k, m);
+            std::vector<int> sizes(k, 0);
 
             for (int i = 0; i < n; ++i) {
-                new_centroids.row(global_labels[i]) += X.row(i);
-                count[global_labels[i]] += 1;
+                int c = global_labels[i];
+                new_centroids.row(c) += X.row(i);
+                sizes[c] += 1;
             }
 
             for (int j = 0; j < k; ++j) {
-                if (count[j] > 1) {
-                    new_centroids.row(j) /= static_cast<double>(count[j]);
+                if (sizes[j] > 0) {
+                    new_centroids.row(j) /= static_cast<double>(sizes[j]);
                 }
             }
 
-            MPI_Barrier(MPI_COMM_WORLD);
+            for (int j = 0; j < k; ++j) {
+                if (sizes[j] == 0) {
+                    int largest = std::distance(sizes.begin(), std::max_element(sizes.begin(), sizes.end()));
 
+                    double max_distance = -1.0;
+                    int farthest = -1;
+
+                    for (int i = 0; i < n; ++i) {
+                        if (global_labels[i] == largest) {
+                            double d = (X.row(i) - global_centroids.row(largest)).squaredNorm();
+
+                            if (d > max_distance) {
+                                max_distance = d;
+                                farthest = i;
+                            }
+                        }
+                    }
+
+                    new_centroids.row(j) = X.row(farthest);
+                    sizes[j] = 1;
+                    sizes[largest] -= 1;
+                }
+            }
+
+
+            // convergence check
             if ((new_centroids - global_centroids).norm() < 1e-3) {
-                break;
-            } 
+                iterating = 0;
+            }
 
             global_centroids = new_centroids;
         }
 
-        bool iterating = false;
-        MPI_Bcast(&iterating, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&iterating, 1, MPI_INT, 0, MPI_COMM_WORLD);
     }
 
     return global_labels;

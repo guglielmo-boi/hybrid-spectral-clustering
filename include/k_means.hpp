@@ -5,6 +5,6 @@
 
 #include <vector>
 
-std::vector<int> k_means(const Matrix& X, int k, int max_iters = 100000);
+std::vector<int> k_means(const Matrix& X, int k, int max_iters = 1000);
 
 #endif

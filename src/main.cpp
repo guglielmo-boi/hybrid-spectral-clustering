@@ -42,7 +42,6 @@ int main(int argc, char** argv)
         max_label = *std::max_element(labels.begin(), labels.end());
     } 
 
-    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Bcast(&rows, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&cols, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&max_label, 1, MPI_INT, 0, MPI_COMM_WORLD);
