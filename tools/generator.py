@@ -3,11 +3,9 @@ import os
 
 SIZES = [1024, 4096, 16384, 65536, 262144]
 
-OUT_GAUSS = "../data/input"
-OUT_MIXED = "../data/input"
+OUT = "../data/input"
 
-os.makedirs(OUT_GAUSS, exist_ok=True)
-os.makedirs(OUT_MIXED, exist_ok=True)
+os.makedirs(OUT, exist_ok=True)
 
 
 def num_blobs_for_n(n):
@@ -62,55 +60,13 @@ def generate_gaussian(n):
     return np.vstack(pts), np.concatenate(labels), k
 
 
-def generate_mixed(n):
-    n1 = n // 3
-    n2 = n // 3
-    n3 = n - n1 - n2
-
-    # Blob
-    blob = np.random.randn(n1, 3) * 0.6
-    y1 = np.zeros(n1, dtype=int)
-
-    # Torus
-    theta = np.random.uniform(0, 2*np.pi, n2)
-    phi = np.random.uniform(0, 2*np.pi, n2)
-    R, r = 4.0, 1.0
-    torus = np.column_stack([
-        (R + r * np.cos(phi)) * np.cos(theta),
-        (R + r * np.cos(phi)) * np.sin(theta),
-        r * np.sin(phi)
-    ])
-    y2 = np.ones(n2, dtype=int)
-
-    # Helix
-    t = np.random.uniform(0, 6*np.pi, n3)
-    helix = np.column_stack([
-        2 * np.cos(t),
-        2 * np.sin(t),
-        t / np.pi
-    ])
-    y3 = np.full(n3, 2, dtype=int)
-
-    X = np.vstack([blob, torus, helix])
-    y = np.concatenate([y1, y2, y3])
-
-    return X, y
-
-
 def main():
     for n in SIZES:
         # Gaussian
         Xg, yg, k = generate_gaussian(n)
         write_csv(
-            f"{OUT_GAUSS}/gaussian_{n}.csv",
+            f"{OUT}/gaussian_{n}.csv",
             Xg, yg
-        )
-
-        # Mixed
-        Xm, ym = generate_mixed(n)
-        write_csv(
-            f"{OUT_MIXED}/mixed_{n}.csv",
-            Xm, ym
         )
 
         print(f"Generated n={n}")
