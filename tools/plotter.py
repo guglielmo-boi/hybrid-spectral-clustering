@@ -1,74 +1,64 @@
 import numpy as np
 import pyvista as pv
-import matplotlib.pyplot as plt
 
-def plot_points2d(points: np.ndarray):
-    # Take only X and Y (columns 0 and 1)
-    x = points[:, 0]
-    y = points[:, 1]
-    labels = points[:, 3]
-
-    plt.figure(figsize=(10, 8))
-
-    # Create scatter plot
-    scatter = plt.scatter(x, y, c=labels, cmap='jet', s=7.5, edgecolors='none')
-
-    # Add a colorbar
-    plt.colorbar(scatter, label='Values')
-
-    plt.xlabel('X Axis')
-    plt.ylabel('Y Axis')
-    plt.title('Spectral clustering with 500 data points')
-
-
-    # Save with transparency
-    #plt.savefig('plot1.png', transparent=True)
-    plt.show()
-    plt.close()
 
 def parse_points(file) -> np.ndarray:
     lines = file.read().strip().splitlines()
-    lines = lines[1:]  # skip header
+    header = lines[0].strip().split(',')
+    lines = lines[1:]
+
+    has_labels = len(header) >= 4
 
     data = []
     for line in lines:
-        x, y, z, label = line.split(',')
-        data.append([float(x), float(y), float(z), int(label)])
+        parts = line.split(',')
+        if has_labels:
+            x, y, z, label = parts
+            data.append([float(x), float(y), float(z), float(label)])
+        else:
+            x, y, z = parts[:3]
+            data.append([float(x), float(y), float(z)])
 
-    return np.array(data)
+    return np.array(data), has_labels
 
 
-def plot_points3d(points: np.ndarray):
+def plot_points(points: np.ndarray, has_labels: bool):
     coords = points[:, :3].astype(float)
-    labels = points[:, 3].astype(float)
 
     cloud = pv.PolyData(coords)
-    cloud["labels"] = labels
-    print(f"Coords shape: {coords.shape}") # Should be (Number, 3)
-
-    sphere_geom = pv.Sphere(radius=0.125) # Adjust radius based on your data scale
+    sphere_geom = pv.Sphere(radius=0.125)
     geom_points = cloud.glyph(geom=sphere_geom, scale=False)
 
     plotter = pv.Plotter()
     plotter.set_background("white")
-    plotter.add_mesh(
-        geom_points,
-        scalars="labels",
-        cmap="jet",
-        smooth_shading=True
-    )
+
+    if has_labels:
+        labels = points[:, 3].astype(float)
+        cloud["labels"] = labels
+        geom_points = cloud.glyph(geom=sphere_geom, scale=False)
+
+        plotter.add_mesh(
+            geom_points,
+            scalars="labels",
+            cmap="jet",
+            smooth_shading=True,
+            show_scalar_bar=True
+        )
+    else:
+        plotter.add_mesh(
+            geom_points,
+            color="lightblue",
+            smooth_shading=True
+        )
 
     plotter.view_xy()
     plotter.add_axes()
-    plotter.camera_set = True
     plotter.reset_camera()
     plotter.show()
-
-    print(f"Data range: {coords.min(axis=0)} to {coords.max(axis=0)}")
-    print(f"Plotter bounds: {plotter.bounds}")
-
-    #plotter.screenshot("plot4.png", transparent_background=True)
     plotter.close()
+
+    print(f"Coords shape: {coords.shape}")
+    print(f"Data range: {coords.min(axis=0)} to {coords.max(axis=0)}")
 
 
 def main():
@@ -85,10 +75,10 @@ def main():
     pargs = args.parse_args()
 
     with open(pargs.input_file, 'r') as file:
-        points = parse_points(file)
-        print("Opened file: %s", file)
-        plot_points3d(points)
-        plot_points2d(points)
+        points, has_labels = parse_points(file)
+        print(f"Opened file: {pargs.input_file}")
+        plot_points(points, has_labels)
+
 
 if __name__ == '__main__':
     main()

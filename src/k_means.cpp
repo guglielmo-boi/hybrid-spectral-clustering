@@ -90,7 +90,7 @@ std::vector<int> k_means(const Matrix& X, int k, int max_iters) {
                 if (sizes[i] == 0) {
                     int largest = std::distance(sizes.begin(), std::max_element(sizes.begin(), sizes.end()));
 
-                    double max_distance = std::numeric_limits<double>::min();
+                    double max_distance = -1.0;
                     int farthest = -1;
 
                     for (int j = 0; j < n; ++j) {
