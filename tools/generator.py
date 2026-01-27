@@ -1,24 +1,15 @@
 import numpy as np
 import os
 
-SIZES = [1024, 4096, 16384, 65536, 262144]
+SIZES = [8192, 32768, 131072]
+CLUSTERS = {
+    8192: 8,
+    32768: 12,
+    131072: 16
+}
 
-OUT = "../data/input"
-
-os.makedirs(OUT, exist_ok=True)
-
-
-def num_blobs_for_n(n):
-    if n <= 2048:
-        return 4
-    elif n <= 8192:
-        return 6
-    elif n <= 32768:
-        return 8
-    elif n <= 131072:
-        return 10
-    else:
-        return 12
+OUT_DIR = "data/input"
+os.makedirs(OUT_DIR, exist_ok=True)
 
 
 def write_csv(path, X, y):
@@ -27,25 +18,16 @@ def write_csv(path, X, y):
         for i in range(X.shape[0]):
             f.write(f"{X[i,0]},{X[i,1]},{X[i,2]},{y[i]}\n")
 
-def generate_gaussian(n):
-    k = num_blobs_for_n(n)
-    spacing = 6.0
+
+# --------------------------------------------------
+# Gaussian blobs (random centers)
+# --------------------------------------------------
+
+def generate_gaussian(n, k):
     sigma = 0.9
+    center_scale = 15.0  # spread centers in space
 
-    grid = int(np.ceil(k ** (1/3)))
-    centers = []
-    for x in range(grid):
-        for y in range(grid):
-            for z in range(grid):
-                centers.append([x * spacing, y * spacing, z * spacing])
-                if len(centers) == k:
-                    break
-            if len(centers) == k:
-                break
-        if len(centers) == k:
-            break
-
-    centers = np.array(centers)
+    centers = np.random.uniform(-center_scale, center_scale, size=(k, 3))
 
     pts = []
     labels = []
@@ -57,21 +39,84 @@ def generate_gaussian(n):
         pts.append(blob)
         labels.append(np.full(cnt, i, dtype=int))
 
-    return np.vstack(pts), np.concatenate(labels), k
+    return np.vstack(pts), np.concatenate(labels)
 
+
+# --------------------------------------------------
+# Mixed shapes
+# --------------------------------------------------
+
+def generate_mixed(n, k):
+    counts = [n // k] * k
+    counts[-1] += n - sum(counts)
+
+    pts = []
+    labels = []
+    shape_id = 0
+
+    # Random Gaussian-like clusters
+    num_blob = k // 3
+    centers = np.random.uniform(-15, 15, size=(num_blob, 3))
+    for i in range(num_blob):
+        cnt = counts[shape_id]
+        blob = np.random.randn(cnt, 3) * 0.6 + centers[i]
+        pts.append(blob)
+        labels.append(np.full(cnt, shape_id, dtype=int))
+        shape_id += 1
+
+    # Tori at random positions
+    num_torus = k // 3
+    for _ in range(num_torus):
+        cnt = counts[shape_id]
+        theta = np.random.uniform(0, 2*np.pi, cnt)
+        phi = np.random.uniform(0, 2*np.pi, cnt)
+        R, r = 4.0, 1.0
+        center = np.random.uniform(-15, 15, size=3)
+
+        torus = np.column_stack([
+            (R + r * np.cos(phi)) * np.cos(theta),
+            (R + r * np.cos(phi)) * np.sin(theta),
+            r * np.sin(phi)
+        ]) + center
+
+        pts.append(torus)
+        labels.append(np.full(cnt, shape_id, dtype=int))
+        shape_id += 1
+
+    # Helices at random positions
+    while shape_id < k:
+        cnt = counts[shape_id]
+        t = np.random.uniform(0, 6*np.pi, cnt)
+        helix = np.column_stack([
+            2 * np.cos(t),
+            2 * np.sin(t),
+            t / np.pi
+        ]) + np.random.uniform(-15, 15, size=3)
+
+        pts.append(helix)
+        labels.append(np.full(cnt, shape_id, dtype=int))
+        shape_id += 1
+
+    return np.vstack(pts), np.concatenate(labels)
+
+
+# --------------------------------------------------
+# Main
+# --------------------------------------------------
 
 def main():
     for n in SIZES:
-        # Gaussian
-        Xg, yg, k = generate_gaussian(n)
-        write_csv(
-            f"{OUT}/gaussian_{n}.csv",
-            Xg, yg
-        )
+        k = CLUSTERS[n]
 
-        print(f"Generated n={n}")
+        Xg, yg = generate_gaussian(n, k)
+        write_csv(f"{OUT_DIR}/gaussian_{n}.csv", Xg, yg)
 
-    print("Done.")
+        Xm, ym = generate_mixed(n, k)
+        write_csv(f"{OUT_DIR}/mixed_{n}.csv", Xm, ym)
+
+        print(f"Generated gaussian_{n}.csv and mixed_{n}.csv")
+
+    print("All datasets generated in data/input/")
 
 
 if __name__ == "__main__":
