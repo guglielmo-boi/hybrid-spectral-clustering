@@ -1,8 +1,6 @@
 #ifndef COMMON_HPP
 #define COMMON_HPP
 
-#include <mpi.h>
-#include <omp.h>
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
