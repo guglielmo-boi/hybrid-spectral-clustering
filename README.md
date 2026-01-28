@@ -1,7 +1,3 @@
-# High Performing Computing for Data Science
-This is the repository for the project of the course of High Performing Computing for Data Science, 
-of the master in Computer Science.
-
-Members of the project:
-- Guglielmo Boi
-- Marco Piccoli
+## High Performance Computing for Data Science 2025-2026
+# Hybrid Parallelization of 3D Spectral Clustering
+### Guglielmo Boi
