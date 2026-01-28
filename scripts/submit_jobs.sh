@@ -5,10 +5,12 @@
 #!/bin/bash
 set -e  # stop if any command fails
 
-PROJECT_DIR="$HOME/Uni/hpc-project"
+PROJECT_DIR="$HOME/hpc-project"
 
 echo "=== Recompiling project ==="
 cd "$PROJECT_DIR"
+
+module load GCC/13.2.0 CMake/3.27.6-GCCcore-13.2.0 OpenMPI/4.1.6-GCC-13.2.0
 
 rm -rf build bin
 cmake -B build
