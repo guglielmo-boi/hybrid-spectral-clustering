@@ -3,28 +3,34 @@
 # --------------------------------------------------
 
 #!/bin/bash
-set -e  # stop if any command fails
+set -e  # Stop if any command fails
 
-PROJECT_DIR="$HOME/hpc-project"
+# --- Resolve important paths ---
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_DIR="$( dirname "$SCRIPT_DIR" )"
+TEMPLATE="$SCRIPT_DIR/job_template.pbs"
 
-echo "=== Recompiling project ==="
-cd "$PROJECT_DIR"
+echo "=== Project root: $PROJECT_DIR ==="
+echo "=== Using template: $TEMPLATE ==="
 
+# --- Load modules needed for compilation ---
 module load GCC/13.2.0 CMake/3.27.6-GCCcore-13.2.0 OpenMPI/4.1.6-GCC-13.2.0
 
-rm -rf build bin
+# --- Rebuild project ---
+echo "=== Recompiling project ==="
+cd "$PROJECT_DIR"
+mkdir -p build bin
+rm -r build bin
 cmake -B build
 cmake --build build
-
 echo "=== Build completed ==="
-cd "$PBS_O_WORKDIR" 2>/dev/null || cd -
 
-DATASETS=("gaussian" "mixed")
-SIZES=(8192 32768 131072)
+# --- Experiment parameters ---
+DATASETS=("gaussian")
+SIZES=(4096 8192 16384)
 RANKS_LIST=(1 2 4 8 16 32)
 
-TEMPLATE="job_template.pbs"
-
+# --- Submit jobs ---
 for DATA in "${DATASETS[@]}"; do
 
   if [ "$DATA" = "gaussian" ]; then
@@ -36,7 +42,7 @@ for DATA in "${DATASETS[@]}"; do
   for SIZE in "${SIZES[@]}"; do
     for RANKS in "${RANKS_LIST[@]}"; do
 
-      JOB_FILE="job_${DATA}_${SIZE}_r${RANKS}.pbs"
+      JOB_FILE="$SCRIPT_DIR/job_${DATA}_${SIZE}_r${RANKS}.pbs"
       JOB_NAME="${PREFIX}_${SIZE}_r${RANKS}"
 
       sed \
@@ -53,4 +59,4 @@ for DATA in "${DATASETS[@]}"; do
   done
 done
 
-echo "=== All jobs submitted ==="
+echo "=== All jobs submitted successfully ==="

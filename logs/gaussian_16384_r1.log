@@ -1,0 +1,7 @@
+Job started at Wed Jan 28 10:32:09 AM CET 2026
+Running on hpc3-c12-n06.unitn.it
+MPI ranks: 1
+OMP threads: 4
+Input: /home/guglielmo.boi/hpc-project/data/input/gaussian_16384.csv
+Output: /home/guglielmo.boi/hpc-project/data/output/gaussian_16384_r1.csv
+------------------------------------
