@@ -36,7 +36,7 @@ std::vector<double> evaluate_diagonal_values(const Eigen::VectorXd& degrees, int
     return diagonal_values;
 }
 
-std::vector<int> spectral_clustering(Matrix& X, int k, double sigma) {
+std::vector<int> spectral_clustering(const Matrix& X, int k, double sigma) {
     int world_rank;
     int world_size;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);

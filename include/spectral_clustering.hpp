@@ -4,8 +4,7 @@
 #include "common.hpp"
 
 #include <vector>
-#include <memory>
 
-std::vector<int> spectral_clustering(Matrix& X, int k, double sigma = 1.0);
+std::vector<int> spectral_clustering(const Matrix& X, int k, double sigma = 1.0);
 
 #endif
