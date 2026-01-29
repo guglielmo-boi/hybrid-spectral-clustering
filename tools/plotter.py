@@ -4,6 +4,8 @@
 
 import numpy as np
 import pyvista as pv
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 
 
 def parse_points(file) -> np.ndarray:
@@ -26,29 +28,47 @@ def parse_points(file) -> np.ndarray:
     return np.array(data), has_labels
 
 
+def generate_distinct_colors(n):
+    """Generate n visually distinct colors using evenly spaced hues."""
+    hues = np.linspace(0, 1, n, endpoint=False)
+    colors = plt.cm.hsv(hues)[:, :3]  # Remove alpha channel
+    np.random.shuffle(colors)         # Avoid similar adjacent colors
+    return ListedColormap(colors)
+
+
 def plot_points(points: np.ndarray, has_labels: bool):
     coords = points[:, :3].astype(float)
 
     cloud = pv.PolyData(coords)
     sphere_geom = pv.Sphere(radius=0.125)
-    geom_points = cloud.glyph(geom=sphere_geom, scale=False)
 
     plotter = pv.Plotter()
     plotter.set_background("white")
 
     if has_labels:
-        labels = points[:, 3].astype(float)
+        labels = points[:, 3].astype(int)
+
+        # Remap labels to consecutive IDs (important for good color spacing)
+        unique_labels = np.unique(labels)
+        label_map = {old: new for new, old in enumerate(unique_labels)}
+        labels = np.vectorize(label_map.get)(labels)
+
         cloud["labels"] = labels
+        n_clusters = len(unique_labels)
+
+        cmap = generate_distinct_colors(n_clusters)
         geom_points = cloud.glyph(geom=sphere_geom, scale=False)
 
         plotter.add_mesh(
             geom_points,
             scalars="labels",
-            cmap="jet",
-            smooth_shading=True,
-            show_scalar_bar=True
+            cmap=cmap,
+            categories=False,
+            show_scalar_bar=False,
+            smooth_shading=True
         )
     else:
+        geom_points = cloud.glyph(geom=sphere_geom, scale=False)
         plotter.add_mesh(
             geom_points,
             color="lightblue",

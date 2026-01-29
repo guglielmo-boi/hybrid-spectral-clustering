@@ -5,12 +5,13 @@
 import numpy as np
 import os
 
-SIZES = [1024, 4096, 8192, 16384]
+SIZES = [1024, 8192, 16384, 32768]
 CLUSTERS = {
     1024: 4,
     4096: 8,
     8192: 16,
-    16384: 32
+    16384: 32,
+    32768: 64
 }
 
 OUT_DIR = "data/input"

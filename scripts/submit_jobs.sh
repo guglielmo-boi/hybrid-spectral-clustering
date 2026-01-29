@@ -3,9 +3,9 @@
 # --------------------------------------------------
 
 #!/bin/bash
-set -e  # Stop if any command fails
+set -e
 
-# --- Resolve important paths ---
+# --- Resolve paths ---
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_DIR="$( dirname "$SCRIPT_DIR" )"
 TEMPLATE="$SCRIPT_DIR/job_template.pbs"
@@ -19,16 +19,15 @@ module load GCC/13.2.0 CMake/3.27.6-GCCcore-13.2.0 OpenMPI/4.1.6-GCC-13.2.0
 # --- Rebuild project ---
 echo "=== Recompiling project ==="
 cd "$PROJECT_DIR"
-mkdir -p build bin
-rm -r build bin
+rm -rf build bin
 cmake -B build
 cmake --build build
 echo "=== Build completed ==="
 
 # --- Experiment parameters ---
-DATASETS=("gaussian")
-SIZES=(4096 8192 16384)
-RANKS_LIST=(1 2 4 8 16 32)
+DATASETS=("gaussian" "mixed")
+SIZES=(8192 16384 32768)
+RANKS_LIST=(1 2 4 8 16)
 
 # --- Submit jobs ---
 for DATA in "${DATASETS[@]}"; do
@@ -42,18 +41,17 @@ for DATA in "${DATASETS[@]}"; do
   for SIZE in "${SIZES[@]}"; do
     for RANKS in "${RANKS_LIST[@]}"; do
 
-      JOB_FILE="$SCRIPT_DIR/job_${DATA}_${SIZE}_r${RANKS}.pbs"
+      NCPUS=$((RANKS * 4))
       JOB_NAME="${PREFIX}_${SIZE}_r${RANKS}"
 
+      echo "Submitting $JOB_NAME (ncpus=$NCPUS)"
+
       sed \
-        -e "s/__RANKS__/${RANKS}/" \
+        -e "s/__NCPUS__/${NCPUS}/" \
         -e "s/\${DATA}/${DATA}/g" \
         -e "s/\${SIZE}/${SIZE}/g" \
         -e "s/\${RANKS}/${RANKS}/g" \
-        "$TEMPLATE" > "$JOB_FILE"
-
-      echo "Submitting $JOB_NAME"
-      qsub -N "$JOB_NAME" "$JOB_FILE"
+        "$TEMPLATE" | qsub -N "$JOB_NAME"
 
     done
   done
