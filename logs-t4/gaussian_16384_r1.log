@@ -1,0 +1,30 @@
+Job started at Fri Jan 30 12:13:00 PM CET 2026
+Running on hpc3-c03-n05.unitn.it
+MPI ranks: 1
+OMP threads per rank: 4
+------------------------------------
+	Command being timed: "mpiexec --mca mpi_cuda_support 0 -n 1 /home/guglielmo.boi/hpc-project/bin/spectral_clustering /home/guglielmo.boi/hpc-project/data/input/gaussian_16384.csv /home/guglielmo.boi/hpc-project/data/output/gaussian_16384_r1.csv"
+	User time (seconds): 4691.42
+	System time (seconds): 3.55
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:18:32
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 10509972
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 9
+	Minor (reclaiming a frame) page faults: 69787
+	Voluntary context switches: 645
+	Involuntary context switches: 12550
+	Swaps: 0
+	File system inputs: 1888
+	File system outputs: 17408
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+------------------------------------
+Job finished at Fri Jan 30 01:31:33 PM CET 2026
