@@ -3,6 +3,6 @@
 
 #include "common.hpp"
 
-Eigen::MatrixXd eigen_solver(const Matrix& L, int n, int k);
+Eigen::MatrixXd compute_first_k_eigenvectors(const Matrix& L, int n, int k);
 
 #endif

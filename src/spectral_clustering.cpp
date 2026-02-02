@@ -3,6 +3,8 @@
 #include "eigen_solver.hpp"
 #include "k_means.hpp"
 
+#include <iostream>
+
 std::vector<double> evaluate_gaussian_similarity_values(const Matrix& X, int l, int r, double sigma) {
     std::vector<double> similarity_values;
     
@@ -48,41 +50,70 @@ std::vector<int> spectral_clustering(const Matrix& X, int k, double sigma) {
     int l = count * world_rank; // index of the local begin row
     int r = count * (world_rank + 1); // index of the local end row
 
-    Matrix local_eigenvectors = Matrix::Zero(count, k);
-    Matrix global_eigenvectors = Matrix::Zero(n, k);
+    Matrix local_eigenvectors(count, k);
+    Matrix global_eigenvectors(n, k);
 
     std::vector<double> local_similarity_values = evaluate_gaussian_similarity_values(X, l, r, sigma);
 
     if (world_rank != 0) {
         // similarity matrix
-        MPI_Gather(local_similarity_values.data(), count * n, MPI_DOUBLE, nullptr, 0, MPI_DOUBLE, 0, MPI_COMM_WORLD); 
+        for (int r = 0; r < world_size; ++r) {
+            if (world_rank == r) {
+                for (int i = 0; i < count; ++i) {
+                    int offset = i * n;
+                    MPI_Gather(local_similarity_values.data() + offset, n, MPI_DOUBLE, nullptr, 0, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+                }
+            }
+            
+            MPI_Barrier(MPI_COMM_WORLD);
+        }
 
-        // diagonal matrix
-        Eigen::VectorXd degrees = Eigen::VectorXd::Zero(n);    
+        local_similarity_values = std::vector<double>(); // clear and free memory
+
+        // degrees matrix as diagonal vector
+        Eigen::VectorXd degrees(n);    
         MPI_Bcast(degrees.data(), n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
         std::vector<double> local_diagonal_values = evaluate_diagonal_values(degrees, l, r);
+        degrees.resize(0); // clear and free memory
+
         MPI_Gather(local_diagonal_values.data(), count, MPI_DOUBLE, nullptr, 0, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        local_diagonal_values = std::vector<double>(); // clear and free memory
     } else {
         // similarity matrix
-        std::vector<double> global_similarity_values(n * n);
-        MPI_Gather(local_similarity_values.data(), count * n, MPI_DOUBLE, global_similarity_values.data(), count * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        Matrix similarity_matrix = Eigen::Map<Matrix>(global_similarity_values.data(), n, n);
-    
-        // diagonal matrix
+        Matrix similarity_matrix(n, n);
+
+        for (int r = 0; r < world_size; ++r) {
+            for (int i = 0; i < count; ++i) {
+                int offset = (r + i) * n;
+                MPI_Gather(local_similarity_values.data() + offset, n, MPI_DOUBLE, similarity_matrix.data() + offset, n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+            }
+
+            MPI_Barrier(MPI_COMM_WORLD);
+        }
+
+        local_similarity_values = std::vector<double>(); // clear and free memory
+
+        // degrees matrix as diagonal vector
         Eigen::VectorXd degrees = similarity_matrix.rowwise().sum();
         MPI_Bcast(degrees.data(), n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        std::vector<double> local_diagonal_values = evaluate_diagonal_values(degrees, l, r);
 
-        std::vector<double> global_diagonal_values(n);
-        MPI_Gather(local_diagonal_values.data(), count, MPI_DOUBLE, global_diagonal_values.data(), count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        Eigen::VectorXd diagonal_vector = Eigen::Map<Eigen::VectorXd>(global_diagonal_values.data(), n);
+        std::vector<double> local_diagonal_values = evaluate_diagonal_values(degrees, l, r);
+        degrees.resize(0); // clear and free memory
+        
+        Eigen::VectorXd degrees_vector(n);
+        MPI_Gather(local_diagonal_values.data(), count, MPI_DOUBLE, degrees_vector.data(), count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        local_diagonal_values = std::vector<double>(); // clear and free memory
 
         // normalized graph Laplacian
-        Matrix L = diagonal_vector.asDiagonal() * similarity_matrix * diagonal_vector.asDiagonal();
+        Matrix L = degrees_vector.asDiagonal() * similarity_matrix * degrees_vector.asDiagonal();
         L = Matrix::Identity(n, n) - L;
 
+        // make sure L is symmetric
+        L = 0.5 * (L + L.transpose());
+
         // compute first k eigenvalues
-        global_eigenvectors = eigen_solver(L, n, k);
+        global_eigenvectors = compute_first_k_eigenvectors(L, n, k);
     }
 
     // eigenvectors normalization

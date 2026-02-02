@@ -70,14 +70,12 @@ int main(int argc, char** argv)
     MPI_Bcast(&rows, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&cols, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&max_label, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-    if (world_rank == 0) {
-        MPI_Bcast(X.data(), X.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    } else {
-        double buffer[rows * cols];
-        MPI_Bcast(buffer, rows * cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        X = Eigen::Map<Matrix>(buffer, rows, cols);
+    
+    if (world_rank != 0) {
+        X = Matrix::Zero(rows, cols);
     }
+
+    MPI_Bcast(X.data(), rows * cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     
     std::vector<int> output_labels = spectral_clustering(X, max_label + 1);
 
