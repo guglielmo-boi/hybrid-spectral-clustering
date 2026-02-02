@@ -1,5 +1,6 @@
 #include "spectral_clustering.hpp"
 
+#include "eigen_solver.hpp"
 #include "k_means.hpp"
 
 std::vector<double> evaluate_gaussian_similarity_values(const Matrix& X, int l, int r, double sigma) {
@@ -80,9 +81,8 @@ std::vector<int> spectral_clustering(const Matrix& X, int k, double sigma) {
         Matrix L = diagonal_vector.asDiagonal() * similarity_matrix * diagonal_vector.asDiagonal();
         L = Matrix::Identity(n, n) - L;
 
-        // eigen decomposition
-        Eigen::SelfAdjointEigenSolver<Matrix> solver(L);
-        global_eigenvectors = solver.eigenvectors().leftCols(k);
+        // compute first k eigenvalues
+        global_eigenvectors = eigen_solver(L, n, k);
     }
 
     // eigenvectors normalization

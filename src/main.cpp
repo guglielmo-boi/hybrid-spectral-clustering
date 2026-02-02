@@ -1,22 +1,47 @@
+#include "common.hpp"
+#include "csv.hpp"
+#include "spectral_clustering.hpp"
+
 #include <vector>
 #include <iostream>
 #include <string>
 #include <algorithm>
 #include <filesystem>
 
-#include "common.hpp"
-#include "csv.hpp"
-#include "spectral_clustering.hpp"
-
 int main(int argc, char** argv) 
 {
-    MPI_Init(&argc, &argv);
+    int provided_threading;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided_threading);
     Eigen::setNbThreads(omp_get_max_threads());
 
     int world_rank;
     int world_size;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+    // PARALLEL ENVIRONMENT INFO
+    int omp_max_threads = omp_get_max_threads();
+    int omp_num_threads = 0;
+
+    #pragma omp parallel
+    {
+        #pragma omp master
+        omp_num_threads = omp_get_num_threads();
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    for (int r = 0; r < world_size; ++r) {
+        if (r == world_rank) {
+            std::cout << "[Rank " << world_rank << "] "
+                    << "MPI ranks total: " << world_size
+                    << " | OMP max threads: " << omp_max_threads
+                    << " | OMP active threads: " << omp_num_threads
+                    << " | Eigen threads: " << Eigen::nbThreads()
+                    << std::endl;
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
 
     const std::string input_path = argv[1];
     const std::string output_path = argv[2];

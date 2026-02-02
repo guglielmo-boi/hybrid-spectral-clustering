@@ -10,6 +10,7 @@ echo "=== Project root: $PROJECT_DIR ==="
 echo "=== Using template: $TEMPLATE ==="
 
 # --- Load modules needed for compilation ---
+module purge
 module load GCC/13.2.0 CMake/3.27.6-GCCcore-13.2.0 OpenMPI/4.1.6-GCC-13.2.0
 
 # --- Rebuild project ---
@@ -22,7 +23,7 @@ echo "=== Build completed ==="
 
 # --- Experiment parameters ---
 DATASETS=("gaussian" "mixed")
-SIZES=(8192 16384 32768)
+SIZES=(32768 65536 131072)
 RANKS_LIST=(1 2 4 8)
 
 # --- Submit jobs ---
@@ -37,7 +38,7 @@ for DATA in "${DATASETS[@]}"; do
   for SIZE in "${SIZES[@]}"; do
     for RANKS in "${RANKS_LIST[@]}"; do
 
-      NCPUS=$((RANKS * 8))
+      NCPUS=$((RANKS * 4))
       JOB_NAME="${PREFIX}_${SIZE}_r${RANKS}"
 
       echo "Submitting $JOB_NAME (ncpus=$NCPUS)"
