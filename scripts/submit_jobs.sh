@@ -23,8 +23,8 @@ echo "=== Build completed ==="
 
 # --- Experiment parameters ---
 DATASETS=("gaussian" "mixed")
-SIZES=(32768 65536 131072)
-RANKS_LIST=(1 2 4 8)
+SIZES=(16384 32768 65536)
+RANKS_LIST=(1 2 4 8 16)
 
 # --- Submit jobs ---
 for DATA in "${DATASETS[@]}"; do
