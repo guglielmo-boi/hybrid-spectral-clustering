@@ -1,17 +1,10 @@
 #!/bin/bash
-#PBS -l select=1:ncpus=__NCPUS__:mem=512gb
+#PBS -l select=1:ncpus=__NCPUS__:mem=1tb
 #PBS -l walltime=6:00:00
 #PBS -l place=pack:excl
 #PBS -q shortCPUQ
 
 cd $PBS_O_WORKDIR
-
-# --- OpenMP settings ---
-export OMP_NUM_THREADS=2
-export OMP_PROC_BIND=close
-export OMP_PLACES=cores
-export OMP_NESTED=false
-export OMP_MAX_ACTIVE_LEVELS=1
 
 # --- Paths ---
 INPUT=$HOME/hpc-project/data/input/${DATA}_${SIZE}.csv
@@ -28,7 +21,6 @@ LOGFILE="$LOGDIR/${DATA}_${SIZE}_r${RANKS}.log"
 echo "Job started at $(date)" > "$LOGFILE"
 echo "Running on $(hostname)" >> "$LOGFILE"
 echo "MPI ranks: ${RANKS}" >> "$LOGFILE"
-echo "OMP threads per rank: ${OMP_NUM_THREADS}" >> "$LOGFILE"
 echo "------------------------------------" >> "$LOGFILE"
 
 # --- Run program (all ranks on one node) ---

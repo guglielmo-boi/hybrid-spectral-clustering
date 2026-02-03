@@ -3,8 +3,6 @@
 #include "eigen_solver.hpp"
 #include "k_means.hpp"
 
-#include <iostream>
-
 std::vector<double> evaluate_gaussian_similarity_values(const Matrix& X, int l, int r, double sigma) {
     std::vector<double> similarity_values;
     
@@ -56,19 +54,12 @@ std::vector<int> spectral_clustering(const Matrix& X, int k, double sigma) {
     std::vector<double> local_similarity_values = evaluate_gaussian_similarity_values(X, l, r, sigma);
 
     if (world_rank != 0) {
-        // similarity matrix
-        for (int r = 0; r < world_size; ++r) {
-            if (world_rank == r) {
-                for (int i = 0; i < count; ++i) {
-                    int offset = i * n;
-                    MPI_Gather(local_similarity_values.data() + offset, n, MPI_DOUBLE, nullptr, 0, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-                }
-            }
-            
-            MPI_Barrier(MPI_COMM_WORLD);
+        // similarity matrix (gather one line at the time)
+        for (int c = 0; c < count; ++c) {
+            MPI_Gather(local_similarity_values.data() + c * n, n, MPI_DOUBLE, nullptr, 0, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         }
 
-        local_similarity_values = std::vector<double>(); // clear and free memory
+        local_similarity_values = {}; // clear and free memory
 
         // degrees matrix as diagonal vector
         Eigen::VectorXd degrees(n);    
@@ -78,21 +69,23 @@ std::vector<int> spectral_clustering(const Matrix& X, int k, double sigma) {
         degrees.resize(0); // clear and free memory
 
         MPI_Gather(local_diagonal_values.data(), count, MPI_DOUBLE, nullptr, 0, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        local_diagonal_values = std::vector<double>(); // clear and free memory
+        local_diagonal_values = {}; // clear and free memory
     } else {
-        // similarity matrix
+        // similarity matrix (gather one line at the time)
         Matrix similarity_matrix(n, n);
 
-        for (int r = 0; r < world_size; ++r) {
-            for (int i = 0; i < count; ++i) {
-                int offset = (r + i) * n;
-                MPI_Gather(local_similarity_values.data() + offset, n, MPI_DOUBLE, similarity_matrix.data() + offset, n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-            }
+        std::vector<double> global_similarity_values(world_size * n);
 
-            MPI_Barrier(MPI_COMM_WORLD);
+        for (int c = 0; c < count; ++c) {
+            MPI_Gather(local_similarity_values.data() + c * n, n, MPI_DOUBLE, global_similarity_values.data(), n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+            for (int r = 0; r < world_size; ++r) {
+                int offset = r * count + c;
+                std::memcpy(similarity_matrix.data() + offset * n, global_similarity_values.data() + r * n, n * sizeof(double));
+            }
         }
 
-        local_similarity_values = std::vector<double>(); // clear and free memory
+        local_similarity_values = {}; // clear and free memory
 
         // degrees matrix as diagonal vector
         Eigen::VectorXd degrees = similarity_matrix.rowwise().sum();
@@ -103,7 +96,7 @@ std::vector<int> spectral_clustering(const Matrix& X, int k, double sigma) {
         
         Eigen::VectorXd degrees_vector(n);
         MPI_Gather(local_diagonal_values.data(), count, MPI_DOUBLE, degrees_vector.data(), count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        local_diagonal_values = std::vector<double>(); // clear and free memory
+        local_diagonal_values = {}; // clear and free memory
 
         // normalized graph Laplacian
         Matrix L = degrees_vector.asDiagonal() * similarity_matrix * degrees_vector.asDiagonal();
@@ -112,7 +105,7 @@ std::vector<int> spectral_clustering(const Matrix& X, int k, double sigma) {
         // make sure L is symmetric
         L = 0.5 * (L + L.transpose());
 
-        // compute first k eigenvalues
+        // compute first k eigenvectors
         global_eigenvectors = compute_first_k_eigenvectors(L, n, k);
     }
 

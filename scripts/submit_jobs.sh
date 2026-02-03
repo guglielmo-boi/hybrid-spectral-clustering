@@ -23,8 +23,8 @@ echo "=== Build completed ==="
 
 # --- Experiment parameters ---
 DATASETS=("gaussian")
-SIZES=(32768 65536 131072)
-RANKS_LIST=(1 2 4 8 16 32)
+SIZES=(16384 32768 65536)
+RANKS_LIST=(1 2 4 8 16 32 64)
 
 # --- Submit jobs ---
 for DATA in "${DATASETS[@]}"; do
@@ -38,7 +38,7 @@ for DATA in "${DATASETS[@]}"; do
   for SIZE in "${SIZES[@]}"; do
     for RANKS in "${RANKS_LIST[@]}"; do
 
-      NCPUS=$((RANKS * 2))
+      NCPUS=$((RANKS))
       JOB_NAME="${PREFIX}_${SIZE}_r${RANKS}"
 
       echo "Submitting $JOB_NAME (ncpus=$NCPUS)"

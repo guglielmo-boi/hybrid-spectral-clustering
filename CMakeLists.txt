@@ -22,9 +22,6 @@ target_include_directories(Spectra INTERFACE
 find_package(MPI REQUIRED)
 include_directories(${MPI_CXX_INCLUDE_PATH})
 
-# OpenMP
-find_package(OpenMP REQUIRED)
-
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 
 file(GLOB_RECURSE SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cpp)
@@ -38,5 +35,4 @@ target_link_libraries(spectral_clustering
         Eigen
         Spectra
         MPI::MPI_CXX
-        OpenMP::OpenMP_CXX
 )
