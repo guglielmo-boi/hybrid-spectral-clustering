@@ -18,8 +18,9 @@ Matrix init_centroids(const Matrix& X, int k) {
 }
 
 std::vector<int> evaluate_labels(const Matrix& X, const Matrix& centroids, int l, int r) {
-    std::vector<int> labels;
+    std::vector<int> labels(r - l);
 
+    #pragma omp parallel for schedule(static) // pre-divide iterations into chunks
     for (int i = l; i < r; ++i) {
         double min_distance = std::numeric_limits<double>::max();
         int label = -1;
@@ -33,11 +34,12 @@ std::vector<int> evaluate_labels(const Matrix& X, const Matrix& centroids, int l
             }
         }
 
-        labels.push_back(label);
+        labels[i - l] = label;
     }
 
     return labels;
 }
+
 
 std::vector<int> k_means(const Matrix& X, int k, int max_iters) {
     int world_rank;
@@ -69,14 +71,30 @@ std::vector<int> k_means(const Matrix& X, int k, int max_iters) {
         MPI_Gather(local_labels.data(), count, MPI_INT, global_labels.data(), count, MPI_INT, 0, MPI_COMM_WORLD);
 
         if (world_rank == 0) {
+            // calculate new centroids
             Matrix new_centroids = Matrix::Zero(k, m);
             std::vector<int> sizes(k, 0);
 
-            // calculate new centroids
-            for (int i = 0; i < n; ++i) {
-                int c = global_labels[i];
-                new_centroids.row(c) += X.row(i);
-                sizes[c] += 1;
+            #pragma omp parallel
+            {
+                Matrix local_centroids = Matrix::Zero(k, m);
+                std::vector<int> local_sizes(k, 0);
+
+                #pragma omp for nowait
+                for (int i = 0; i < n; ++i) {
+                    int c = global_labels[i];
+                    local_centroids.row(c) += X.row(i);
+                    local_sizes[c] += 1;
+                }
+
+                #pragma omp critical
+                {
+                    new_centroids += local_centroids;
+
+                    for (int i = 0; i < k; ++i) {
+                        sizes[i] += local_sizes[i];
+                    }
+                }
             }
 
             for (int i = 0; i < k; ++i) {

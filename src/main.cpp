@@ -10,7 +10,10 @@
 
 int main(int argc, char** argv) 
 {
-    MPI_Init(&argc, &argv);
+    int provided_threading;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided_threading);
+    assert(provided_threading == MPI_THREAD_FUNNELED);
+    Eigen::setNbThreads(omp_get_max_threads());
 
     int world_rank;
     int world_size;

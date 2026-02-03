@@ -38,7 +38,7 @@ for DATA in "${DATASETS[@]}"; do
   for SIZE in "${SIZES[@]}"; do
     for RANKS in "${RANKS_LIST[@]}"; do
 
-      NCPUS=$((RANKS))
+      NCPUS=$((RANKS * 1))
       JOB_NAME="${PREFIX}_${SIZE}_r${RANKS}"
 
       echo "Submitting $JOB_NAME (ncpus=$NCPUS)"

@@ -6,6 +6,13 @@
 
 cd $PBS_O_WORKDIR
 
+# --- OpenMP settings ---
+export OMP_NUM_THREADS=1
+export OMP_PROC_BIND=close
+export OMP_PLACES=cores
+export OMP_NESTED=false
+export OMP_MAX_ACTIVE_LEVELS=1
+
 # --- Paths ---
 INPUT=$HOME/hpc-project/data/input/${DATA}_${SIZE}.csv
 OUTPUT=$HOME/hpc-project/data/output/${DATA}_${SIZE}_r${RANKS}.csv
@@ -21,6 +28,7 @@ LOGFILE="$LOGDIR/${DATA}_${SIZE}_r${RANKS}.log"
 echo "Job started at $(date)" > "$LOGFILE"
 echo "Running on $(hostname)" >> "$LOGFILE"
 echo "MPI ranks: ${RANKS}" >> "$LOGFILE"
+echo "OMP threads per rank: ${OMP_NUM_THREADS}" >> "$LOGFILE"
 echo "------------------------------------" >> "$LOGFILE"
 
 # --- Run program (all ranks on one node) ---
