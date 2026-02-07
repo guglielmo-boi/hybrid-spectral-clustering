@@ -11,5 +11,7 @@ rsync -avz --delete \
   --exclude=".vscode/" \
   --exclude="bin/" \
   --exclude="build/" \
+  --exclude="data/output/" \
+  --exclude="logs/"
   "$LOCAL_DIR" \
   "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}"

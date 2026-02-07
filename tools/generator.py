@@ -5,7 +5,7 @@
 import numpy as np
 import os
 
-SIZES = [16384, 32768, 65536]
+SIZES = [131072]
 CLUSTERS = {
     8192: 4,
     16384: 8,

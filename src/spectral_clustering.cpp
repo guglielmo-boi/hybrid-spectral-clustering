@@ -23,12 +23,12 @@ std::vector<double> evaluate_gaussian_similarity_values(const Matrix& X, int l, 
     return similarity_values;
 }
 
-std::vector<double> evaluate_diagonal_values(const Eigen::VectorXd& degrees, int l, int r) {
+std::vector<double> evaluate_diagonal_values(const Eigen::VectorXd& degrees) {
     std::vector<double> diagonal_values;
 
-    for (int i = l; i < r; ++i) {
-        if (degrees(i) > 1e-12) {
-            diagonal_values.push_back(1.0 / sqrt(degrees(i)));
+    for (const auto& d : degrees) {
+        if (d > 1e-12) {
+            diagonal_values.push_back(1.0 / sqrt(d));
         } else {
             diagonal_values.push_back(0.0);
         }
@@ -48,6 +48,9 @@ std::vector<int> spectral_clustering(const Matrix& X, int k, double sigma) {
     int l = count * world_rank; // index of the local begin row
     int r = count * (world_rank + 1); // index of the local end row
 
+    Eigen::VectorXd local_degrees(count);
+    Eigen::VectorXd global_degrees (n);
+
     Matrix local_eigenvectors(count, k);
     Matrix global_eigenvectors(n, k);
 
@@ -62,11 +65,9 @@ std::vector<int> spectral_clustering(const Matrix& X, int k, double sigma) {
         local_similarity_values = {}; // clear and free memory
 
         // degrees matrix as diagonal vector
-        Eigen::VectorXd degrees(n);    
-        MPI_Bcast(degrees.data(), n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-        std::vector<double> local_diagonal_values = evaluate_diagonal_values(degrees, l, r);
-        degrees.resize(0); // clear and free memory
+        MPI_Scatter(nullptr, 0, MPI_DOUBLE, local_degrees.data(), count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        std::vector<double> local_diagonal_values = evaluate_diagonal_values(local_degrees);
+        local_degrees.resize(0); // clear and free memory
 
         MPI_Gather(local_diagonal_values.data(), count, MPI_DOUBLE, nullptr, 0, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         local_diagonal_values = {}; // clear and free memory
@@ -80,32 +81,32 @@ std::vector<int> spectral_clustering(const Matrix& X, int k, double sigma) {
             MPI_Gather(local_similarity_values.data() + c * n, n, MPI_DOUBLE, global_similarity_values.data(), n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
             for (int r = 0; r < world_size; ++r) {
-                int offset = r * count + c;
-                std::memcpy(similarity_matrix.data() + offset * n, global_similarity_values.data() + r * n, n * sizeof(double));
+                std::memcpy(similarity_matrix.row(r * count + c).data(), global_similarity_values.data() + r * n, n * sizeof(double));
             }
         }
 
         local_similarity_values = {}; // clear and free memory
+        global_similarity_values = {};
 
         // degrees matrix as diagonal vector
-        Eigen::VectorXd degrees = similarity_matrix.rowwise().sum();
-        MPI_Bcast(degrees.data(), n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        global_degrees = similarity_matrix.rowwise().sum();
 
-        std::vector<double> local_diagonal_values = evaluate_diagonal_values(degrees, l, r);
-        degrees.resize(0); // clear and free memory
+        MPI_Scatter(global_degrees.data(), count, MPI_DOUBLE, local_degrees.data(), count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        std::vector<double> local_diagonal_values = evaluate_diagonal_values(local_degrees);
+        local_degrees.resize(0); // clear and free memory
         
-        Eigen::VectorXd degrees_vector(n);
-        MPI_Gather(local_diagonal_values.data(), count, MPI_DOUBLE, degrees_vector.data(), count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        Eigen::VectorXd diagonal_vector(n);
+        MPI_Gather(local_diagonal_values.data(), count, MPI_DOUBLE, diagonal_vector.data(), count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         local_diagonal_values = {}; // clear and free memory
 
         // normalized graph Laplacian
-        Matrix L = degrees_vector.asDiagonal() * similarity_matrix * degrees_vector.asDiagonal();
+        Matrix L = diagonal_vector.asDiagonal() * similarity_matrix * diagonal_vector.asDiagonal();
         L = Matrix::Identity(n, n) - L;
 
         // make sure L is symmetric
         L = 0.5 * (L + L.transpose());
 
-        // compute first k eigenvectors
+        // compute first k eigenvectors (one vector per column)
         global_eigenvectors = compute_first_k_eigenvectors(L, n, k);
     }
 

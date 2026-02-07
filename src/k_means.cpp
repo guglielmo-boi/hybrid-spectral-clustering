@@ -4,20 +4,20 @@
 #include <limits>
 #include <cmath>
 
-Matrix init_centroids(const Matrix& X, int k) {
-    Matrix centroids(k, X.cols());
+Matrix init_centroids(const Matrix& U, int k) {
+    Matrix centroids(k, U.cols());
 
     std::default_random_engine rng(100);
-    std::uniform_int_distribution<> dist(0, X.rows() - 1);
+    std::uniform_int_distribution<> dist(0, U.rows() - 1);
     
     for (int i = 0; i < k; ++i) {
-        centroids.row(i) = X.row(dist(rng));
+        centroids.row(i) = U.row(dist(rng));
     }
 
     return centroids;
 }
 
-std::vector<int> evaluate_labels(const Matrix& X, const Matrix& centroids, int l, int r) {
+std::vector<int> evaluate_labels(const Matrix& U, const Matrix& centroids, int l, int r) {
     std::vector<int> labels(r - l);
 
     #pragma omp parallel for schedule(static) // pre-divide iterations into chunks
@@ -26,7 +26,7 @@ std::vector<int> evaluate_labels(const Matrix& X, const Matrix& centroids, int l
         int label = -1;
 
         for (int j = 0; j < centroids.rows(); ++j) {
-            double distance = (X.row(i) - centroids.row(j)).squaredNorm();
+            double distance = (U.row(i) - centroids.row(j)).squaredNorm();
 
             if (distance < min_distance) {
                 min_distance = distance;
@@ -41,22 +41,22 @@ std::vector<int> evaluate_labels(const Matrix& X, const Matrix& centroids, int l
 }
 
 
-std::vector<int> k_means(const Matrix& X, int k, int max_iters) {
+std::vector<int> k_means(const Matrix& U, int k, int max_iters) {
     int world_rank;
     int world_size;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-    int n = X.rows();
-    int m = X.cols();
+    int n = U.rows();
+    int m = U.cols();
     int count = n / world_size; // number of rows for each process
     int l = count * world_rank; // index of the local begin row
     int r = count * (world_rank + 1); // index of the local end row
 
-    Matrix global_centroids(k, X.cols());
+    Matrix global_centroids(k, m);
 
     if (world_rank == 0) {
-        global_centroids = init_centroids(X, k);
+        global_centroids = init_centroids(U, k);
     }
 
     std::vector<int> local_labels(count, -1); 
@@ -66,7 +66,7 @@ std::vector<int> k_means(const Matrix& X, int k, int max_iters) {
 
     for (int iter = 0; iterating && iter < max_iters; ++iter) {
         MPI_Bcast(global_centroids.data(), k * m, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        local_labels = evaluate_labels(X, global_centroids, l, r);
+        local_labels = evaluate_labels(U, global_centroids, l, r);
 
         MPI_Gather(local_labels.data(), count, MPI_INT, global_labels.data(), count, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -83,7 +83,7 @@ std::vector<int> k_means(const Matrix& X, int k, int max_iters) {
                 #pragma omp for nowait
                 for (int i = 0; i < n; ++i) {
                     int c = global_labels[i];
-                    local_centroids.row(c) += X.row(i);
+                    local_centroids.row(c) += U.row(i);
                     local_sizes[c] += 1;
                 }
 
@@ -97,13 +97,13 @@ std::vector<int> k_means(const Matrix& X, int k, int max_iters) {
                 }
             }
 
-            for (int i = 0; i < k; ++i) {
+            for (int i = 0; i < k; ++i) { // not worth parallelizing (k is small)
                 if (sizes[i] > 0) {
                     new_centroids.row(i) /= static_cast<double>(sizes[i]);
                 }
             }
 
-            // split empty clusters
+            // split clusters to avoid empty clusters
             for (int i = 0; i < k; ++i) {
                 if (sizes[i] == 0) {
                     int largest = std::distance(sizes.begin(), std::max_element(sizes.begin(), sizes.end()));
@@ -113,7 +113,7 @@ std::vector<int> k_means(const Matrix& X, int k, int max_iters) {
 
                     for (int j = 0; j < n; ++j) {
                         if (global_labels[j] == largest) {
-                            double distance = (X.row(j) - global_centroids.row(largest)).squaredNorm();
+                            double distance = (U.row(j) - global_centroids.row(largest)).squaredNorm();
 
                             if (distance > max_distance) {
                                 max_distance = distance;
@@ -122,7 +122,7 @@ std::vector<int> k_means(const Matrix& X, int k, int max_iters) {
                         }
                     }
 
-                    new_centroids.row(i) = X.row(farthest);
+                    new_centroids.row(i) = U.row(farthest);
                     sizes[i] = 1;
                     sizes[largest] -= 1;
                 }
